@@ -773,6 +773,15 @@ class Model(metaclass=ModelBase):
             parent_inserted = False
             if not raw:
                 parent_inserted = self._save_parents(cls, using, update_fields)
+            # Skip an UPDATE when adding an instance and primary key has a default.
+            if (
+                not raw and
+                not force_insert and
+                self._state.adding and
+                meta.pk.default and
+                meta.pk.default is not NOT_PROVIDED
+            ):
+                force_insert = True
             updated = self._save_table(
                 raw, cls, force_insert or parent_inserted,
                 force_update, using, update_fields,
@@ -840,15 +849,6 @@ class Model(metaclass=ModelBase):
         if not pk_set and (force_update or update_fields):
             raise ValueError("Cannot force an update in save() with no primary key.")
         updated = False
-        # Skip an UPDATE when adding an instance and primary key has a default.
-        if (
-            not raw and
-            not force_insert and
-            self._state.adding and
-            meta.pk.default and
-            meta.pk.default is not NOT_PROVIDED
-        ):
-            force_insert = True
         # If possible, try an UPDATE. If that doesn't update anything, do an INSERT.
         if pk_set and not force_insert:
             base_qs = cls._base_manager.using(using)
